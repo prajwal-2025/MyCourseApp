@@ -1,87 +1,91 @@
-// src/pages/Home.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
-import { motion } from 'framer-motion';
-import { useNotification } from '../context/NotificationContext';
-import CourseCard from '../components/CourseCard';
+import CourseCard from '../components/CourseCard'; // Ensures the correct component is used
+import SuggestionBox from '../components/SuggestionBox';
+import { BookOpen, Target, Award } from 'lucide-react';
 
-const SkeletonCard = () => (
-    <div className="bg-slate-800/50 rounded-2xl overflow-hidden animate-pulse">
-        <div className="bg-slate-700 w-full h-48"></div>
-        <div className="p-5">
-            <div className="h-6 bg-slate-700 rounded w-3/4 mb-2"></div>
-            <div className="h-4 bg-slate-700 rounded w-1/2 mb-4"></div>
-            <div className="flex justify-between items-center">
-                <div className="h-8 bg-slate-700 rounded w-1/4"></div>
-                <div className="h-10 bg-slate-700 rounded-lg w-1/3"></div>
-            </div>
-        </div>
+const Feature = ({ icon, title, children }) => (
+  <div className="bg-white p-6 rounded-lg shadow-sm text-center">
+    <div className="flex justify-center items-center mb-4 text-brand-primary">
+      {icon}
     </div>
+    <h3 className="text-xl font-bold mb-2">{title}</h3>
+    <p className="text-gray-600">{children}</p>
+  </div>
 );
 
-export default function Home() {
-    const [courses, setCourses] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const { showNotification } = useNotification();
+const Home = () => {
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const loadCourses = async () => {
-            setLoading(true);
-            try {
-                const snap = await getDocs(collection(db, 'courses'));
-                setCourses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            } catch (e) { 
-                console.error("Failed to load courses:", e);
-                showNotification("Could not fetch available courses.", "error");
-            } finally { 
-                setLoading(false); 
-            }
-        };
-        loadCourses();
-    }, [showNotification]);
+  useEffect(() => {
+    const fetchCourses = async () => {
+      setLoading(true);
+      try {
+        const querySnapshot = await getDocs(collection(db, 'courses'));
+        const coursesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setCourses(coursesData);
+      } catch (error) {
+        console.error("Error fetching courses: ", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCourses();
+  }, []);
 
-    return (
-        <div>
-            {/* Hero Section */}
-            <section className="relative overflow-hidden pt-20 pb-20 md:pt-28 md:pb-28">
-                <div className="absolute top-0 -left-36 w-96 h-96 bg-purple-500/20 rounded-full filter blur-3xl opacity-50 animate-blob"></div>
-                <div className="absolute top-1/2 right-0 w-96 h-96 bg-indigo-500/20 rounded-full filter blur-3xl opacity-50 animate-blob animation-delay-2000"></div>
-                <div className="container mx-auto px-6 relative z-10 text-center">
-                    <motion.h1 initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="text-4xl md:text-6xl font-extrabold leading-tight mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-400">
-                        Unlock Your Potential
-                    </motion.h1>
-                    <motion.p initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.1 }} className="text-slate-300 mb-8 max-w-2xl mx-auto text-lg">
-                        Bite-sized explanations, exam-focused content, and personalized doubt support for diploma mining students.
-                    </motion.p>
-                </div>
-            </section>
+  return (
+    <div className="bg-gray-50">
+      {/* Hero Section */}
+      <section className="relative text-center py-20 sm:py-32 px-4 bg-white">
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)]"></div>
+          <div className="relative z-10 container mx-auto">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-brand-dark tracking-tighter mb-4">
+              Master the Mines, Master Your Future
+            </h1>
+            <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+              High-quality, exam-focused courses designed to propel your career in the mining industry.
+            </p>
+          </div>
+      </section>
 
-            {/* Courses Section */}
-            <section className="py-16">
-                <div className="container mx-auto px-6">
-                    <h2 className="text-3xl font-bold mb-8 text-center text-white">Available Courses</h2>
-                    {loading ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
-                        </div>
-                    ) : courses.length > 0 ? (
-                        <motion.div
-                            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
-                            initial="hidden"
-                            animate="visible"
-                            variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
-                        >
-                            {courses.map(c => <CourseCard key={c.id} course={c} />)}
-                        </motion.div>
-                    ) : (
-                        <div className="text-center text-slate-400 bg-slate-800/50 py-12 rounded-lg">
-                            <p>No courses available at the moment.</p>
-                            <p className="text-sm mt-2">Please check back later!</p>
-                        </div>
-                    )}
-                </div>
-            </section>
+      {/* Features Section */}
+      <section className="py-16 bg-gray-100">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Feature icon={<BookOpen size={40} />} title="Expert-Led Content">
+              Learn from seasoned professionals with real-world mining experience.
+            </Feature>
+            <Feature icon={<Target size={40} />} title="Exam-Focused">
+              Our curriculum is tailored to help you ace certification and competitive exams.
+            </Feature>
+            <Feature icon={<Award size={40} />} title="Guaranteed Results">
+              We're confident in our methods. Follow our path and see guaranteed improvement.
+            </Feature>
+          </div>
         </div>
-    );
-}
+      </section>
+
+      {/* Available Courses Section */}
+      <section id="courses" className="container mx-auto px-4 py-16 sm:py-20">
+        <h2 className="text-3xl sm:text-4xl font-bold text-center text-brand-dark mb-10">Available Courses</h2>
+        {loading ? (
+          <div className="text-center text-gray-600">Loading courses...</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* This now correctly renders a CourseCard for each course */}
+            {courses.map(course => (
+              <CourseCard key={course.id} course={course} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Suggestion Box Section */}
+      <SuggestionBox />
+    </div>
+  );
+};
+
+export default Home;

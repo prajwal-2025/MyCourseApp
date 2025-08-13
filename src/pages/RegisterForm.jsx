@@ -1,209 +1,214 @@
-// src/pages/RegisterForm.jsx (DEMO MODE)
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { db, auth } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../firebase';
 import { useNotification } from '../context/NotificationContext';
-import { motion } from 'framer-motion';
-import { onAuthStateChanged } from 'firebase/auth';
+import { UploadCloud, Clipboard, Check, AlertCircle } from 'lucide-react';
 
-// Icons
-const UploadCloudIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="m16 16-4-4-4 4"></path></svg>;
-const CopyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>;
-
-const CLOUDINARY_CLOUD_NAME = "drddwst2w";
-const CLOUDINARY_UPLOAD_PRESET = "course_screenshot";
-
-export default function RegisterForm() {
-    const { id: courseId } = useParams();
+const RegisterForm = () => {
+    const { id } = useParams();
     const navigate = useNavigate();
     const { showNotification } = useNotification();
 
-    const [currentUser, setCurrentUser] = useState(null);
     const [course, setCourse] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState('');
-    
+    const [submitting, setSubmitting] = useState(false);
+    const [copied, setCopied] = useState(false);
+
     const [formData, setFormData] = useState({ name: '', email: '', phone: '', college: '' });
-    const [screenshotFile, setScreenshotFile] = useState(null);
     const [paymentOption, setPaymentOption] = useState('full');
-    const [priceToPay, setPriceToPay] = useState(0);
+    const [screenshot, setScreenshot] = useState(null);
+
+    const UPI_ID = 'pathanminingacademy.62732523@hdfcbank';
+    const UPI_NAME = 'Pathan Mining Academy';
 
     useEffect(() => {
-        const fetchData = async (user) => {
-            // **FIX: This now handles both real and mock users**
-            if (!user) {
-                localStorage.setItem('intendedPath', `/register/${courseId}`);
-                navigate('/student-login');
-                return;
-            }
-            setCurrentUser(user);
-            setFormData(prev => ({ ...prev, phone: user.phoneNumber?.replace('+91', '') || '' }));
+        const studentDataString = sessionStorage.getItem('student');
+        if (studentDataString) {
+            const studentData = JSON.parse(studentDataString);
+            setFormData(prev => ({ 
+                ...prev, 
+                phone: studentData.phone || '',
+                name: studentData.name || ''
+            }));
+        }
+    }, []);
 
+    useEffect(() => {
+        const fetchCourse = async () => {
+            if (!id) return;
             try {
-                const courseRef = doc(db, 'courses', courseId);
-                const courseSnap = await getDoc(courseRef);
-
-                if (!courseSnap.exists()) {
-                    setError('Course not found.');
+                const docRef = doc(db, 'courses', id);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    setCourse({ id: docSnap.id, ...docSnap.data() });
+                } else {
                     showNotification('Course not found.', 'error');
-                    navigate('/');
-                    return;
                 }
-                const courseData = courseSnap.data();
-                setCourse(courseData);
-                setPriceToPay(courseData.earlyBirdPrice || courseData.basePrice);
-
-            } catch (err) {
-                console.error("Error fetching data:", err);
-                setError('Failed to load registration details.');
+            } catch (error) {
+                console.error("Error fetching course:", error);
+                showNotification('Failed to load course details.', 'error');
             } finally {
                 setLoading(false);
             }
         };
+        fetchCourse();
+    }, [id, showNotification]);
 
-        const mockUserStr = sessionStorage.getItem('mockUser');
-        if (mockUserStr) {
-            fetchData(JSON.parse(mockUserStr));
-        } else {
-            const unsubscribe = onAuthStateChanged(auth, fetchData);
-            return () => unsubscribe();
-        }
-    }, [courseId, navigate, showNotification]);
-
-    const copyToClipboard = (text) => {
-        navigator.clipboard.writeText(text).then(() => {
-            showNotification('UPI ID copied to clipboard!', 'success');
-        });
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-    const handleFileChange = (e) => setScreenshotFile(e.target.files[0]);
+    const handleFileChange = (e) => {
+        if (e.target.files[0]) {
+            setScreenshot(e.target.files[0]);
+        }
+    };
+
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(UPI_ID);
+        setCopied(true);
+        showNotification('UPI ID copied to clipboard!', 'success');
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!screenshotFile) {
-            showNotification("Please upload a screenshot of your payment.", "error");
+        if (!screenshot) {
+            showNotification('Please upload a payment screenshot.', 'error');
             return;
         }
-        setIsSubmitting(true);
+        setSubmitting(true);
+
         try {
-            const uploadFormData = new FormData();
-            uploadFormData.append('file', screenshotFile);
-            uploadFormData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+            const screenshotRef = ref(storage, `screenshots/${id}/${Date.now()}_${screenshot.name}`);
+            const uploadResult = await uploadBytes(screenshotRef, screenshot);
+            const screenshotUrl = await getDownloadURL(uploadResult.ref);
 
-            const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-                method: 'POST',
-                body: uploadFormData,
-            });
-
-            if (!response.ok) throw new Error('Image upload failed');
-            
-            const data = await response.json();
-            const screenshotUrl = data.secure_url;
-            
-            if (!screenshotUrl) throw new Error("Cloudinary did not return a URL.");
-            
-            const docId = `${currentUser.uid}_${courseId}`;
-            const finalPrice = paymentOption === 'full' ? priceToPay : 99;
-            
-            await setDoc(doc(db, 'registrations', docId), {
-                userId: currentUser.uid,
-                courseId,
+            const registrationData = {
                 ...formData,
+                courseId: id,
+                courseName: course.name,
+                paymentOption,
+                amountPaid: paymentOption === 'full' ? course.earlyBirdPrice : 99,
+                priceOffered: course.earlyBirdPrice,
                 screenshotUrl,
-                priceOffered: priceToPay,
-                amountPaid: finalPrice,
-                paymentStatus: paymentOption === 'full' ? 'full_payment_pending' : 'seat_lock_pending',
                 confirmed: false,
-                registeredAt: new Date(),
-            });
+                paymentStatus: paymentOption === 'full' ? 'full_payment_received' : 'seat_lock_pending',
+                registeredAt: serverTimestamp(),
+            };
+
+            await addDoc(collection(db, 'registrations'), registrationData);
+            
             navigate('/confirmation');
+
         } catch (error) {
-            console.error('Error submitting form:', error);
-            showNotification('There was an error submitting your registration.', 'error');
+            console.error("Error submitting registration:", error);
+            showNotification('Submission failed. Please try again.', 'error');
         } finally {
-            setIsSubmitting(false);
+            setSubmitting(false);
         }
     };
 
     if (loading) {
-        return <div className="bg-slate-900 min-h-screen flex items-center justify-center text-white text-lg">Loading registration details...</div>;
+        return <div className="text-center py-20">Loading course details...</div>;
     }
-    
-    if (error) return <div className="bg-slate-900 min-h-screen flex items-center justify-center text-red-500 font-semibold text-lg">{error}</div>;
+
+    if (!course) {
+        return <div className="text-center py-20">Could not load course. Please go back and try again.</div>;
+    }
 
     return (
-        <div className="bg-slate-900 text-white min-h-screen font-sans pt-12 pb-12 md:pt-20 md:pb-20">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl mx-auto px-4">
-                <div className="bg-slate-800/50 border border-slate-700 p-6 md:p-8 rounded-2xl">
-                    <div className="text-center mb-8">
-                        <h2 className="text-3xl md:text-4xl font-bold">{course?.name}</h2>
-                        <p className="text-slate-400 mt-2">Complete the steps below to secure your spot.</p>
-                    </div>
-                    <div className="mb-8">
-                        <h3 className="text-xl font-bold text-slate-100 mb-4">Step 1: Choose Payment Option</h3>
-                        <div className="grid sm:grid-cols-2 gap-4 mt-4">
-                            {[
-                                { type: 'full', label: 'Pay in Full', price: priceToPay },
-                                { type: 'lock', label: 'Lock Your Seat', price: 99 }
-                            ].map(opt => (
-                                <label key={opt.type} className={`relative flex items-center p-4 rounded-lg border-2 cursor-pointer ${paymentOption === opt.type ? 'bg-purple-500/10 border-purple-500' : 'bg-slate-800 border-slate-600'}`}>
-                                    <input type="radio" name="paymentOption" value={opt.type} checked={paymentOption === opt.type} onChange={(e) => setPaymentOption(e.target.value)} className="opacity-0 absolute" />
-                                    <div>
-                                        <p className="font-semibold text-slate-100">{opt.label}</p>
-                                        <p className="text-purple-400 font-bold text-2xl">₹{opt.price}</p>
-                                    </div>
-                                </label>
-                            ))}
-                        </div>
-                        <div className="mt-6 text-center bg-slate-900 p-4 rounded-lg">
-                            <p className="font-semibold text-slate-300">Pay using UPI to the ID below:</p>
-                            <div className="flex items-center justify-center bg-slate-700/50 p-2 rounded-md mt-2">
-                                <p className="font-mono text-purple-300">pathanminingacademy.62732523@hdfcbank</p>
-                                <button onClick={() => copyToClipboard('pathanminingacademy.62732523@hdfcbank')} className="ml-3 text-slate-400"><CopyIcon /></button>
-                            </div>
-                        </div>
-                    </div>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <h3 className="text-xl font-bold text-slate-100 mb-2">Step 2: Fill Your Details</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            {[
-                                { id: 'name', label: 'Full Name', type: 'text', placeholder: 'Your Name' },
-                                { id: 'email', label: 'Email Address', type: 'email', placeholder: 'you@example.com' },
-                                { id: 'phone', label: 'Phone Number', type: 'tel', disabled: true },
-                                { id: 'college', label: 'College Name', type: 'text', placeholder: 'Your College' }
-                            ].map(field => (
-                                <div key={field.id}>
-                                    <label htmlFor={field.id} className="block text-sm font-medium text-slate-300 mb-1">{field.label}</label>
-                                    <input type={field.type} id={field.id} name={field.id} placeholder={field.placeholder} value={formData[field.id]} onChange={handleChange} required disabled={field.disabled}
-                                        className="w-full p-3 bg-slate-700/50 border-2 border-slate-600 rounded-md" />
-                                </div>
-                            ))}
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">Step 3: Upload Payment Screenshot</label>
-                            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-600 border-dashed rounded-md">
-                                <div className="space-y-1 text-center">
-                                    <UploadCloudIcon />
-                                    <div className="flex text-sm text-slate-400">
-                                        <label htmlFor="file-upload" className="relative cursor-pointer bg-slate-800 rounded-md font-medium text-purple-400 hover:text-purple-300">
-                                            <span>Upload a file</span>
-                                            <input id="file-upload" name="file-upload" type="file" accept="image/*" className="sr-only" onChange={handleFileChange} required />
-                                        </label>
-                                        <p className="pl-1">or drag and drop</p>
-                                    </div>
-                                    <p className="text-xs text-slate-500">{screenshotFile ? screenshotFile.name : 'PNG, JPG, GIF up to 10MB'}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit" disabled={isSubmitting} className="w-full flex justify-center py-3 px-4 rounded-lg text-lg font-semibold text-white bg-purple-600 hover:bg-purple-700">
-                            {isSubmitting ? 'Submitting...' : 'Submit Registration'}
-                        </motion.button>
-                    </form>
+        <div className="min-h-screen bg-slate-900 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-2xl mx-auto">
+                <div className="text-center mb-10">
+                    <h1 className="text-3xl sm:text-4xl font-extrabold text-white">{course.name}</h1>
+                    <p className="mt-2 text-lg text-slate-400">Complete the steps below to secure your spot.</p>
                 </div>
-            </motion.div>
+
+                <form onSubmit={handleSubmit} className="bg-slate-800/50 p-8 rounded-xl shadow-lg border border-slate-700 space-y-8">
+                    
+                    {/* Step 1: Fill Your Details */}
+                    <div>
+                        <h3 className="text-xl font-bold text-white mb-4">Step 1: Fill Your Details</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <input type="text" name="name" placeholder="Full Name" value={formData.name} onChange={handleInputChange} required className="w-full p-3 bg-slate-700/50 border-2 border-slate-600 rounded-md focus:ring-purple-500 focus:border-purple-500 text-white" />
+                            <input type="email" name="email" placeholder="Email Address" onChange={handleInputChange} required className="w-full p-3 bg-slate-700/50 border-2 border-slate-600 rounded-md focus:ring-purple-500 focus:border-purple-500 text-white" />
+                            <input type="tel" name="phone" placeholder="Phone Number" value={formData.phone} onChange={handleInputChange} required className="w-full p-3 bg-slate-700/50 border-2 border-slate-600 rounded-md focus:ring-purple-500 focus:border-purple-500 text-white" />
+                            <input type="text" name="college" placeholder="Your College" onChange={handleInputChange} required className="w-full p-3 bg-slate-700/50 border-2 border-slate-600 rounded-md focus:ring-purple-500 focus:border-purple-500 text-white" />
+                        </div>
+                    </div>
+                    
+                    {/* Step 2: Choose Payment Option */}
+                    <div>
+                        <h3 className="text-xl font-bold text-white mb-4">Step 2: Choose Payment Option</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div onClick={() => setPaymentOption('full')} className={`p-6 border-2 rounded-lg cursor-pointer transition ${paymentOption === 'full' ? 'border-purple-500 bg-purple-500/10' : 'border-slate-600 hover:border-purple-500'}`}>
+                                <h4 className="font-bold text-lg text-white">Pay in Full</h4>
+                                <p className="text-3xl font-extrabold text-purple-400 mt-2">₹{course.earlyBirdPrice}</p>
+                            </div>
+                            <div onClick={() => setPaymentOption('seat_lock')} className={`p-6 border-2 rounded-lg cursor-pointer transition ${paymentOption === 'seat_lock' ? 'border-purple-500 bg-purple-500/10' : 'border-slate-600 hover:border-purple-500'}`}>
+                                <h4 className="font-bold text-lg text-white">Lock Your Seat</h4>
+                                <p className="text-3xl font-extrabold text-purple-400 mt-2">₹99</p>
+                            </div>
+                        </div>
+                        <div className="mt-6 text-center bg-slate-700/50 p-4 rounded-lg">
+                            <p className="text-sm text-slate-400 mb-2">Copy our UPI ID</p>
+                            <div className="flex items-center justify-center bg-slate-800 border border-slate-600 rounded-md px-3 py-2">
+                                <span className="font-mono text-slate-200">{UPI_ID}</span>
+                                <button type="button" onClick={copyToClipboard} className="ml-4 p-1.5 rounded-md hover:bg-slate-700 transition">
+                                    {copied ? <Check className="text-green-400" size={16} /> : <Clipboard size={16} className="text-slate-400"/>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Step 3: Payment */}
+                    <div>
+                        <h3 className="text-xl font-bold text-white mb-4">Step 3: Payment</h3>
+                        <div className="bg-yellow-500/10 border-l-4 border-yellow-400 p-4 rounded-r-lg">
+                            <div className="flex">
+                                <div className="flex-shrink-0"><AlertCircle className="h-5 w-5 text-yellow-400" /></div>
+                                <div className="ml-3">
+                                    <p className="text-sm text-yellow-200">
+                                        Open your UPI app, paste the copied ID, and before paying, please verify the name is <strong className="font-bold">"{UPI_NAME}"</strong>.
+                                        Take a screenshot after payment.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Step 4: Upload Payment Screenshot */}
+                    <div>
+                        <h3 className="text-xl font-bold text-white mb-4">Step 4: Upload Payment Screenshot</h3>
+                        <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-600 border-dashed rounded-md">
+                            <div className="space-y-1 text-center">
+                                <UploadCloud className="mx-auto h-12 w-12 text-slate-500" />
+                                <div className="flex text-sm text-slate-400">
+                                    <label htmlFor="file-upload" className="relative cursor-pointer bg-slate-800 rounded-md font-medium text-purple-400 hover:text-purple-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-purple-500 px-1">
+                                        <span>Upload a file</span>
+                                        <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept="image/*" required />
+                                    </label>
+                                    <p className="pl-1">or drag and drop</p>
+                                </div>
+                                <p className="text-xs text-slate-500">{screenshot ? screenshot.name : 'PNG, JPG, GIF up to 10MB'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <div>
+                        <button type="submit" disabled={submitting} className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-opacity-50">
+                            {submitting ? 'Submitting...' : 'Submit Registration'}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
-}
+};
+
+export default RegisterForm;

@@ -1,4 +1,3 @@
-// src/pages/Admin.jsx
 import React, { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, onSnapshot, updateDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
@@ -142,15 +141,29 @@ export default function Admin() {
         });
     };
     
+    // THIS IS THE CORRECTED FUNCTION
     const handleSaveCourse = async (courseData) => {
+        // Prevent slashes in the course code, as they create invalid paths.
+        if (courseData.courseCode.includes('/')) {
+            showNotification('Error: Course Code cannot contain a forward slash ("/").', 'error');
+            return;
+        }
+
         try {
-            const courseRef = doc(db, 'courses', courseData.id || courseData.courseCode.toLowerCase());
+            // This is the key fix:
+            // If we are editing, use the ID from the `editingCourse` state.
+            // If we are creating, use the new `courseCode` from the form.
+            const docId = editingCourse ? editingCourse.id : courseData.courseCode.toLowerCase();
+            const courseRef = doc(db, 'courses', docId);
+
+            // Save the data using setDoc to either create or overwrite.
             await setDoc(courseRef, courseData, { merge: true });
-            showNotification(courseData.id ? "Course updated!" : "Course added!", "success");
+            
+            showNotification(editingCourse ? "Course updated!" : "Course added!", "success");
             closeModal();
         } catch (error) {
-            showNotification("Failed to save course.", "error");
-            console.error(error);
+            showNotification("Failed to save course. Check console for details.", "error");
+            console.error("Firebase save error: ", error);
         }
     };
     
@@ -177,7 +190,10 @@ export default function Admin() {
         setEditingCourse(course);
         setIsModalOpen(true);
     };
-    const closeModal = () => setIsModalOpen(false);
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setEditingCourse(null);
+    };
 
     if (!user) return <div className="bg-slate-900 min-h-screen flex items-center justify-center text-white">Checking authentication...</div>;
 

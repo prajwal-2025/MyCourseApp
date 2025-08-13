@@ -1,146 +1,141 @@
-// src/pages/CourseDetail.jsx (DEMO MODE)
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
-import { motion } from 'framer-motion';
-import { useNotification } from '../context/NotificationContext';
-import { onAuthStateChanged } from 'firebase/auth';
+import { db } from '../firebase';
+import { CheckCircle, User, BookOpen, Clock } from 'lucide-react';
 
-// Icons
-const CheckCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
-const UserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>;
-
-const CourseDetailSkeleton = () => (
-    <div className="bg-slate-900 min-h-screen text-white p-4 md:p-8 animate-pulse">
-        <div className="container mx-auto max-w-7xl pt-20">
-            <div className="h-10 bg-slate-800 rounded w-3/4 mb-4"></div>
-            <div className="h-6 bg-slate-800 rounded w-1/2 mb-8"></div>
-            <div className="grid lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-6"><div className="h-96 bg-slate-800 rounded-2xl"></div></div>
-                <div className="lg:col-span-1"><div className="bg-slate-800/50 h-64 rounded-2xl"></div></div>
-            </div>
-        </div>
-    </div>
-);
-
-export default function CourseDetail() {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const { showNotification } = useNotification();
+const CourseDetail = () => {
     const [course, setCourse] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [isEnrolled, setIsEnrolled] = useState(false);
-    const [user, setUser] = useState(null);
+    const { id } = useParams();
+    const navigate = useNavigate();
 
     useEffect(() => {
-        const fetchData = async (currentUser) => {
+        const fetchCourse = async () => {
             if (!id) {
                 setLoading(false);
                 return;
-            }
-            setLoading(true);
-            setIsEnrolled(false); 
-            
+            };
             try {
-                const courseDocRef = doc(db, 'courses', id);
-                const courseDocSnap = await getDoc(courseDocRef);
-
-                if (courseDocSnap.exists()) {
-                    setCourse({ id: courseDocSnap.id, ...courseDocSnap.data() });
-
-                    if (currentUser) {
-                        setUser(currentUser);
-                        if (currentUser.uid.startsWith('mock-uid-')) {
-                           setIsEnrolled(false);
-                           return;
-                        }
-                        
-                        const registrationDocRef = doc(db, 'registrations', `${currentUser.uid}_${id}`);
-                        const registrationDocSnap = await getDoc(registrationDocRef);
-                        setIsEnrolled(registrationDocSnap.exists());
-                    }
+                const docRef = doc(db, 'courses', id);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    setCourse({ id: docSnap.id, ...docSnap.data() });
                 } else {
-                    showNotification("Course not found.", "error");
-                    navigate('/');
+                    console.log("No such document!");
                 }
             } catch (error) {
-                console.error("Error fetching course data: ", error);
-                showNotification("Failed to load course details.", "error");
+                console.error("Error fetching course: ", error);
             } finally {
                 setLoading(false);
             }
         };
-        
-        const mockUserStr = sessionStorage.getItem('mockUser');
-        if (mockUserStr) {
-            fetchData(JSON.parse(mockUserStr));
-        } else {
-            const unsubscribe = onAuthStateChanged(auth, fetchData);
-            return () => unsubscribe();
-        }
-
-    }, [id, navigate, showNotification]);
+        fetchCourse();
+    }, [id]);
 
     const handleRegisterClick = () => {
-        if (!user) {
-            localStorage.setItem('intendedPath', `/course/${id}`);
-            showNotification("Please log in to register for a course.", "info");
-            navigate('/student-login');
-            return;
-        }
+        const studentData = sessionStorage.getItem('student');
+        const targetUrl = course.id === 'bundle' ? '/register-bundle' : `/register/${id}`;
 
-        if (isEnrolled) {
-            showNotification("You are already enrolled in this course.", "info");
-            navigate('/student-home');
+        if (studentData) {
+            navigate(targetUrl);
         } else {
-            navigate(`/register/${id}`);
+            sessionStorage.setItem('redirectUrl', targetUrl);
+            navigate('/student-login');
         }
     };
 
-    if (loading) return <CourseDetailSkeleton />;
-    if (!course) return null;
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center min-h-[80vh]">
+                <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-purple-500"></div>
+            </div>
+        );
+    }
 
-    const buttonText = isEnrolled ? "Go to Dashboard" : "Register Now";
-    const buttonClass = isEnrolled 
-        ? "w-full bg-green-600 hover:bg-green-700 text-white font-semibold text-lg py-3 px-4 rounded-xl"
-        : "w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-lg py-3 px-4 rounded-xl";
+    if (!course) {
+        return <div className="text-center py-20 text-xl text-gray-600">Course not found.</div>;
+    }
+
+    const discount = course.basePrice && course.earlyBirdPrice
+        ? Math.round(((course.basePrice - course.earlyBirdPrice) / course.basePrice) * 100)
+        : 0;
 
     return (
-        <motion.div className="bg-slate-900 text-white pt-12 pb-12 md:pt-20 md:pb-20" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div className="container mx-auto max-w-7xl px-6">
-                <h1 className="text-4xl md:text-5xl font-extrabold mb-2">{course.name}</h1>
-                <div className="flex items-center text-slate-400 text-lg"><UserIcon /><span className="ml-2">Taught by {course.instructor}</span></div>
-                <div className="grid lg:grid-cols-3 gap-8 lg:gap-12 mt-8">
-                    <div className="lg:col-span-2">
-                        <div className="rounded-2xl overflow-hidden mb-8"><img src={course.thumbnail || `https://placehold.co/800x450/1e1b4b/ffffff?text=${course.name}`} alt={course.name} className="w-full h-auto object-cover" /></div>
-                        <h2 className="text-2xl font-bold text-slate-100 mb-4">About This Course</h2>
-                        <p className="text-slate-300 leading-relaxed mb-8">{course.description}</p>
-                        <h2 className="text-2xl font-bold text-slate-100 mb-4">What You'll Learn</h2>
-                        {course.highlights && course.highlights.length > 0 && (
-                            <ul className="space-y-3">
-                                {course.highlights.map((point, index) => (
-                                    <li key={index} className="flex items-start">
-                                        <div className="flex-shrink-0 mt-1"><CheckCircleIcon /></div>
-                                        <span className="ml-3 text-slate-300">{point}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+        <div className="bg-white">
+            <div className="bg-slate-900 text-white py-12 sm:py-16">
+                <div className="container mx-auto px-4">
+                    <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{course.name}</h1>
+                    <div className="flex items-center mt-4 text-lg text-slate-300">
+                        <User size={20} className="mr-2" />
+                        <span>Taught by {course.instructor}</span>
                     </div>
-                    <div className="lg:col-span-1">
-                        <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6 md:p-8 shadow-lg sticky top-28">
-                            <h2 className="text-2xl font-bold mb-5 text-center text-white">Enroll Now</h2>
-                            <div className="text-center mb-5">
-                                <p className="text-5xl font-extrabold text-white">₹{course.earlyBirdPrice}</p>
-                                <p className="text-xl line-through text-slate-400 mt-1">₹{course.basePrice}</p>
+                </div>
+            </div>
+
+            <div className="container mx-auto px-4 py-12">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
+                    <div className="lg:col-span-2">
+                        <img 
+                            src={course.thumbnail} 
+                            alt={course.name} 
+                            className="w-full rounded-lg shadow-2xl mb-8 aspect-video object-cover"
+                        />
+                        
+                        <div className="space-y-10">
+                            <div>
+                                <h2 className="text-3xl font-bold text-gray-800 mb-4 flex items-center gap-3">
+                                    <BookOpen size={28} /> About This Course
+                                </h2>
+                                <p className="text-gray-700 leading-relaxed whitespace-pre-line">{course.description}</p>
                             </div>
-                            <p className="text-sm text-center text-green-400 font-medium mb-6">{course.discountNote || 'Special early bird price available!'}</p>
-                            <button onClick={handleRegisterClick} className={buttonClass}>{buttonText}</button>
+
+                            <div>
+                                <h2 className="text-3xl font-bold text-gray-800 mb-4">What You'll Learn</h2>
+                                <ul className="space-y-3">
+                                    {course.highlights?.map((highlight, index) => (
+                                        <li key={index} className="flex items-start">
+                                            <CheckCircle className="text-green-500 mt-1 mr-3 flex-shrink-0" size={20} />
+                                            <span className="text-gray-700">{highlight}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="lg:col-span-1">
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg shadow-lg p-6 sticky top-28">
+                            <h3 className="text-2xl font-bold text-center mb-4 text-slate-800">Enroll Now</h3>
+                            
+                            <div className="text-center mb-4">
+                                <span className="text-4xl font-bold text-purple-600">₹{course.earlyBirdPrice}</span>
+                                <span className="text-xl text-slate-500 line-through ml-2">₹{course.basePrice}</span>
+                            </div>
+
+                            {discount > 0 && (
+                                <div className="text-center text-green-700 font-semibold mb-4 bg-green-100 py-2 rounded-md">
+                                    You save {discount}% with the early bird price!
+                                </div>
+                            )}
+
+                            <button 
+                                onClick={handleRegisterClick}
+                                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105"
+                            >
+                                Register Now
+                            </button>
+                            
+                            <div className="text-center mt-4 text-sm text-slate-500 flex items-center justify-center">
+                                <Clock size={16} className="mr-1.5" />
+                                <span>{course.earlyBirdSlots} early bird slots remaining!</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </motion.div>
+        </div>
     );
-}
+};
+
+export default CourseDetail;
