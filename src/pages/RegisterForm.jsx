@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase';
-import { useNotification } from '../context/NotificationContext';
+import { db, storage } from '../firebase.js';
+import { useNotification } from '../context/NotificationContext.jsx';
 import { UploadCloud, Clipboard, Check, AlertCircle } from 'lucide-react';
 
 const RegisterForm = () => {

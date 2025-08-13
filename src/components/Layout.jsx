@@ -6,8 +6,9 @@ import { Menu, X } from 'lucide-react';
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const navLinkClasses = "text-gray-600 transition duration-150 ease-in-out hover:text-brand-primary hover:bg-brand-light px-3 py-2 rounded-md text-base font-medium";
-  const activeLinkClasses = "text-brand-primary bg-blue-100";
+  // Updated to use brand colors for consistency
+  const navLinkClasses = "text-brand-dark transition duration-150 ease-in-out hover:text-brand-primary hover:bg-brand-light px-3 py-2 rounded-md text-base font-medium";
+  const activeLinkClasses = "text-brand-primary bg-brand-light"; // Using brand's light background
 
   return (
     <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b border-gray-200">
@@ -15,7 +16,6 @@ const Header = () => {
         <div className="flex items-center justify-between h-20">
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center space-x-3">
-              {/* This now uses a direct URL from Firebase Storage for maximum reliability. */}
               <img className="h-14 w-auto" src="https://firebasestorage.googleapis.com/v0/b/courseapp-8b8f2.firebasestorage.app/o/logo.png?alt=media&token=61959b27-673c-49c0-8a43-3e6b6bb04ed3" alt="PMA-Logo" />
               <span className="text-xl font-bold text-brand-primary-dark tracking-tight">Pathan Mining Academy</span>
             </Link>
@@ -78,7 +78,8 @@ const Footer = () => (
 
 const Layout = () => {
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    // Using brand's light background for the whole page
+    <div className="flex flex-col min-h-screen bg-brand-light">
       <Header />
       <NotificationDisplay />
       <main className="flex-grow">

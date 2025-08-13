@@ -1,10 +1,10 @@
 // src/pages/BundleRegister.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, auth, functions } from '../firebase';
+import { db, auth, functions } from '../firebase.js';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { useNotification } from '../context/NotificationContext';
+import { useNotification } from '../context/NotificationContext.jsx';
 import { motion } from 'framer-motion';
 
 // Helper function to convert file to base64

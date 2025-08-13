@@ -1,13 +1,20 @@
-// src/main.jsx
 import React from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App';
-import './index.css'; // Make sure you have a basic CSS file for Tailwind directives
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom'; // 1. Import BrowserRouter
+import App from './App.jsx';
+import './index.css';
+import { NotificationProvider } from './context/NotificationContext.jsx'; // Make sure path is correct
+import ErrorBoundary from './components/ErrorBoundary.jsx'; // Make sure path is correct
 
-const container = document.getElementById('root');
-const root = createRoot(container);
-root.render(
+ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    {/* 2. Wrap your entire App with BrowserRouter */}
+    <BrowserRouter>
+      <ErrorBoundary>
+        <NotificationProvider>
+          <App />
+        </NotificationProvider>
+      </ErrorBoundary>
+    </BrowserRouter>
   </React.StrictMode>
 );

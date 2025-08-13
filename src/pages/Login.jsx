@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
-import { useNotification } from '../context/NotificationContext';
+import { auth } from '../firebase.js';
+import { useNotification } from '../context/NotificationContext.jsx';
 import { motion } from 'framer-motion';
 
 // Icons

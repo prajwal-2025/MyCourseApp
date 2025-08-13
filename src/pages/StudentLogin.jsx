@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useNotification } from '../context/NotificationContext';
+import { useNotification } from '../context/NotificationContext.jsx';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firebase.js';
 
 const StudentLogin = () => {
     const [phone, setPhone] = useState('');
