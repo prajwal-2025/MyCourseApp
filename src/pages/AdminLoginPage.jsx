@@ -1,32 +1,37 @@
-// src/pages/Login.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase.js';
-import { useNotification } from '../context/NotificationContext.jsx';
 import { motion } from 'framer-motion';
 
-// Icons
-const MailIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>;
-const LockIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>;
+// --- Import Firebase, Context, and Components ---
+import { auth } from '../firebase';
+import { useNotification } from '../context/NotificationContext';
+import { MailIcon, LockIcon } from '../components/Icons';
 
-export default function Login() {
+/**
+ * A page component for administrators to log in using email and password.
+ */
+export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { showNotification } = useNotification();
 
+  /**
+   * Handles the admin login process using Firebase email/password authentication.
+   * @param {React.FormEvent} e - The form submission event.
+   */
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      showNotification('Login successful!', 'success');
-      navigate('/admin');
+      showNotification('Login successful! Redirecting...', 'success');
+      navigate('/admin'); // Navigate to the admin dashboard on successful login
     } catch (error) {
-      console.error("Login failed:", error);
-      showNotification("Invalid email or password.", 'error');
+      console.error("Admin login failed:", error);
+      showNotification("Invalid email or password. Please try again.", 'error');
     } finally {
       setLoading(false);
     }

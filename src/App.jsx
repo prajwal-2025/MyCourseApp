@@ -1,64 +1,98 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { Routes, Route, Outlet } from "react-router-dom";
+import Layout from "./components/Layout";
+import HomePage from "./pages/HomePage";
+import CourseDetailsPage from "./pages/CourseDetailsPage";
+import RegisterForm from "./pages/RegisterForm";
+import ConfirmationPage from "./pages/ConfirmationPage";
+import StudentLoginPage from "./pages/StudentLoginPage";
+import StudentHomePage from "./pages/StudentHomePage";
+import AdminLoginPage from "./pages/AdminLoginPage";
+import AdminPage from "./pages/AdminPage";
+import BundleRegister from "./pages/BundleRegister";
+import Suggestion from "./pages/Suggestion";
+import { auth } from "./firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import ScrollToTop from './components/ScrollToTop'; // <-- Import it
 
-// Corrected paths for components and pages
-import Layout from './components/Layout.jsx';
-import Home from './pages/Home.jsx';
-import Login from './pages/Login.jsx';
-import Admin from './pages/Admin.jsx';
-import StudentLogin from './pages/StudentLogin.jsx';
-import StudentHome from './pages/StudentHome.jsx';
-import CourseDetail from './pages/CourseDetail.jsx';
-import RegisterForm from './pages/RegisterForm.jsx';
-import BundleRegister from './pages/BundleRegister.jsx';
-import Confirmation from './pages/Confirmation.jsx';
-import ProtectedRoute from './ProtectedRoute.jsx'; // Assuming this is in src/
+// --- Auth Context & Provider ---
+export const AuthContext = createContext();
 
-function App() {
-  return (
-    <Layout>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/student-login" element={<StudentLogin />} />
-        <Route path="/register" element={<RegisterForm />} />
-        <Route path="/course/:id" element={<CourseDetail />} />
-        <Route path="/confirmation" element={<Confirmation />} />
-        
-        {/* Admin Protected Route */}
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Admin />
-            </ProtectedRoute>
-          } 
-        />
+export const AuthProvider = ({ children }) => {
+    const [currentUser, setCurrentUser] = useState(null);
+    const [studentData, setStudentData] = useState(null); // Added state for student data
+    const [loading, setLoading] = useState(true);
 
-        {/* Student Protected Routes */}
-        <Route 
-          path="/student-home" 
-          element={
-            <ProtectedRoute requiredRole="student">
-              <StudentHome />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/bundle-register" 
-          element={
-            <ProtectedRoute requiredRole="student">
-              <BundleRegister />
-            </ProtectedRoute>
-          } 
-        />
+    useEffect(() => {
+        // Firebase auth listener for admin
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setCurrentUser(user);
+            setLoading(false);
+        });
 
-        {/* Catch-all Route */}
-        <Route path="*" element={<div>404 Not Found</div>} />
-      </Routes>
-    </Layout>
-  );
+        // Check for student data in sessionStorage on initial load
+        try {
+            const studentDataString = sessionStorage.getItem('student');
+            if (studentDataString) {
+                setStudentData(JSON.parse(studentDataString));
+            }
+        } catch (error) {
+            console.error("Failed to parse student data from sessionStorage", error);
+            sessionStorage.removeItem('student');
+        }
+
+        return unsubscribe;
+    }, []);
+
+    // Function for student login, updates both state and sessionStorage
+    const loginStudent = (student) => {
+        setStudentData(student);
+        sessionStorage.setItem('student', JSON.stringify(student));
+    };
+
+    // Function for student logout
+    const logoutStudent = () => {
+        setStudentData(null);
+        sessionStorage.removeItem('student');
+    };
+
+    const value = { 
+        currentUser, 
+        studentData, 
+        loginStudent, 
+        logoutStudent, 
+        loading, 
+        userId: currentUser?.uid 
+    };
+
+    return (
+        <AuthContext.Provider value={value}>
+            {!loading && children}
+        </AuthContext.Provider>
+    );
+};
+
+export const useAuth = () => useContext(AuthContext);
+
+// --- Main App Component ---
+export default function App() {
+    return (
+        <AuthProvider>
+            <ScrollToTop /> {/* Ensure ScrollToTop is included for route changes */}
+            <Routes>
+                <Route element={<Layout />}>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/course/:id" element={<CourseDetailsPage />} />
+                    <Route path="/register/:id" element={<RegisterForm />} />
+                    <Route path="/confirmation" element={<ConfirmationPage />} />
+                    <Route path="/student-login" element={<StudentLoginPage />} />
+                    <Route path="/student-home" element={<StudentHomePage />} />
+                    <Route path="/admin-login" element={<AdminLoginPage />} />
+                    <Route path="/admin" element={<AdminPage />} />
+                    <Route path="/bundle-register" element={<BundleRegister />} />
+                    <Route path="/suggestion" element={<Suggestion />} />
+                </Route>
+            </Routes>
+        </AuthProvider>
+    );
 }
-
-export default App;

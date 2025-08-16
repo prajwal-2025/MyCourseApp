@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 
-// This component is based on the stable version you provided.
+/**
+ * A form for creating and editing course details.
+ * It handles its own state for form inputs and communicates save/cancel actions
+ * back to the parent component.
+ *
+ * @param {object} props - The component's props.
+ * @param {function} props.onSave - Callback function to execute when the form is submitted.
+ * @param {function} props.onCancel - Callback function to execute when the form is cancelled.
+ * @param {object|null} props.course - The course object to edit, or null if creating a new course.
+ */
 export default function CourseForm({ onSave, onCancel, course }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -14,15 +23,17 @@ export default function CourseForm({ onSave, onCancel, course }) {
     whatsappLink: '',
     thumbnail: '',
     highlights: [],
-    offerText: '', // New, simple text field for the offer
+    offerText: '',
   });
   const [highlightInput, setHighlightInput] = useState('');
 
+  // This effect pre-fills the form when a course object is passed for editing.
+  // It also resets the form when the `course` prop is null (for creating a new course).
   useEffect(() => {
     if (course) {
       setFormData({
         name: course.name || '',
-        courseCode: course.courseCode || '',
+        courseCode: course.id || '', // Use the document ID for the courseCode
         description: course.description || '',
         instructor: course.instructor || 'PMA',
         basePrice: course.basePrice || 0,
@@ -32,18 +43,19 @@ export default function CourseForm({ onSave, onCancel, course }) {
         whatsappLink: course.whatsappLink || '',
         thumbnail: course.thumbnail || '',
         highlights: course.highlights || [],
-        offerText: course.offerText || '', // Load the offer text if it exists
+        offerText: course.offerText || '',
       });
     } else {
-        // Reset to initial state for a new course
-        setFormData({
-            name: '', courseCode: '', description: '', instructor: 'PMA',
-            basePrice: 0, earlyBirdPrice: 0, earlyBirdSlots: 0, totalSlots: 0,
-            whatsappLink: '', thumbnail: '', highlights: [], offerText: ''
-        });
+      // Reset to initial state for a new course
+      setFormData({
+        name: '', courseCode: '', description: '', instructor: 'PMA',
+        basePrice: 0, earlyBirdPrice: 0, earlyBirdSlots: 0, totalSlots: 0,
+        whatsappLink: '', thumbnail: '', highlights: [], offerText: ''
+      });
     }
   }, [course]);
 
+  // Handles changes for all form inputs.
   const handleChange = (e) => {
     const { name, value, type } = e.target;
     setFormData(prev => ({
@@ -52,23 +64,26 @@ export default function CourseForm({ onSave, onCancel, course }) {
     }));
   };
 
+  // Adds a new highlight to the list.
   const handleAddHighlight = () => {
     if (highlightInput.trim()) {
-        setFormData(prev => ({
-            ...prev,
-            highlights: [...prev.highlights, highlightInput.trim()]
-        }));
-        setHighlightInput('');
+      setFormData(prev => ({
+        ...prev,
+        highlights: [...prev.highlights, highlightInput.trim()]
+      }));
+      setHighlightInput(''); // Clear the input field
     }
   };
 
+  // Removes a highlight from the list by its index.
   const handleRemoveHighlight = (index) => {
     setFormData(prev => ({
-        ...prev,
-        highlights: prev.highlights.filter((_, i) => i !== index)
+      ...prev,
+      highlights: prev.highlights.filter((_, i) => i !== index)
     }));
   };
 
+  // Prevents default form submission and calls the onSave callback with the form data.
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave(formData);
@@ -117,7 +132,6 @@ export default function CourseForm({ onSave, onCancel, course }) {
         <input name="whatsappLink" value={formData.whatsappLink} onChange={handleChange} placeholder="https://chat.whatsapp.com/..." className="w-full p-3 bg-slate-700/50 border-2 border-slate-600 rounded-md" />
       </div>
       
-      {/* --- New, Simple Offer Text Field --- */}
       <div>
         <label className="block text-sm font-medium mb-1">Offer Text (Optional)</label>
         <input name="offerText" value={formData.offerText} onChange={handleChange} placeholder="e.g., Limited Time!" className="w-full p-3 bg-slate-700/50 border-2 border-slate-600 rounded-md" />
@@ -126,22 +140,22 @@ export default function CourseForm({ onSave, onCancel, course }) {
       <div>
         <label className="block text-sm font-medium mb-1">Course Highlights</label>
         <div className="flex gap-2">
-            <input 
-                type="text"
-                value={highlightInput}
-                onChange={(e) => setHighlightInput(e.target.value)}
-                placeholder="Add a learning point"
-                className="flex-grow p-3 bg-slate-700/50 border-2 border-slate-600 rounded-md"
-            />
-            <button type="button" onClick={handleAddHighlight} className="px-4 py-2 rounded-md font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition">Add</button>
+          <input 
+            type="text"
+            value={highlightInput}
+            onChange={(e) => setHighlightInput(e.target.value)}
+            placeholder="Add a learning point"
+            className="flex-grow p-3 bg-slate-700/50 border-2 border-slate-600 rounded-md"
+          />
+          <button type="button" onClick={handleAddHighlight} className="px-4 py-2 rounded-md font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition">Add</button>
         </div>
         <ul className="mt-3 space-y-2">
-            {formData.highlights.map((h, i) => (
-                <li key={i} className="flex justify-between items-center bg-slate-700 p-2 rounded-md">
-                    <span>{h}</span>
-                    <button type="button" onClick={() => handleRemoveHighlight(i)} className="text-red-400 hover:text-red-300">✕</button>
-                </li>
-            ))}
+          {formData.highlights.map((h, i) => (
+            <li key={i} className="flex justify-between items-center bg-slate-700 p-2 rounded-md">
+              <span>{h}</span>
+              <button type="button" onClick={() => handleRemoveHighlight(i)} className="text-red-400 hover:text-red-300">✕</button>
+            </li>
+          ))}
         </ul>
       </div>
       
